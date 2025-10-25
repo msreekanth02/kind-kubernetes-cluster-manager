@@ -15,65 +15,111 @@
 
 ### High-Level Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Host Machine (macOS)                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                          Docker Desktop                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                     Kind Kubernetes Cluster                            │
-│                                                                         │
-│  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐   │
-│  │ Control Plane     │  │   Worker Node 1   │  │   Worker Node 2   │   │
-│  │ my-cluster-control│  │ my-cluster-worker │  │ my-cluster-worker2│   │
-│  │                   │  │                   │  │                   │   │
-│  │ • API Server      │  │ • kubelet         │  │ • kubelet         │   │
-│  │ • etcd            │  │ • Container       │  │ • Container       │   │
-│  │ • Scheduler       │  │   Runtime         │  │   Runtime         │   │
-│  │ • Controller Mgr  │  │ • kube-proxy      │  │ • kube-proxy      │   │
-│  │ • kubelet         │  │                   │  │                   │   │
-│  └───────────────────┘  └───────────────────┘  └───────────────────┘   │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │                        Application Layer                           │ │
-│  │                                                                     │ │
-│  │  ┌─────────────────┐                 ┌─────────────────────────────┐ │ │
-│  │  │ Nginx Deployment│                 │      MySQL Deployment       │ │ │
-│  │  │                 │                 │                             │ │ │
-│  │  │ ┌─────────────┐ │                 │ ┌─────────────────────────┐ │ │ │
-│  │  │ │    Pod 1    │ │                 │ │         Pod 1           │ │ │ │
-│  │  │ │ nginx:latest│ │                 │ │    mysql:8.0            │ │ │ │
-│  │  │ │             │ │                 │ │                         │ │ │ │
-│  │  │ │ Port: 80    │ │                 │ │ Port: 3306              │ │ │ │
-│  │  │ │ Port: 443   │ │                 │ │                         │ │ │ │
-│  │  │ └─────────────┘ │                 │ │ Persistent Volume       │ │ │ │
-│  │  │                 │                 │ │ /var/lib/mysql          │ │ │ │
-│  │  │ Service:        │                 │ └─────────────────────────┘ │ │ │
-│  │  │ nginx-service   │                 │                             │ │ │
-│  │  │ ClusterIP       │                 │ Service:                    │ │ │
-│  │  └─────────────────┘                 │ mysql-service               │ │ │
-│  │                                      │ ClusterIP                   │ │ │
-│  │                                      └─────────────────────────────┘ │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Host Machine (macOS)"
+        subgraph "Docker Desktop"
+            subgraph "Kind Kubernetes Cluster"
+                subgraph "Control Plane"
+                    CP[Control Plane Node<br/>my-cluster-control]
+                    API[API Server :6443]
+                    ETCD[etcd :2379]
+                    SCHED[Scheduler]
+                    CM[Controller Manager]
+                    CP_KUBELET[kubelet]
+                end
+                
+                subgraph "Worker Node 1"
+                    W1[Worker Node<br/>my-cluster-worker]
+                    W1_KUBELET[kubelet]
+                    W1_RUNTIME[Container Runtime]
+                    W1_PROXY[kube-proxy]
+                end
+                
+                subgraph "Worker Node 2"
+                    W2[Worker Node<br/>my-cluster-worker2]
+                    W2_KUBELET[kubelet]
+                    W2_RUNTIME[Container Runtime]
+                    W2_PROXY[kube-proxy]
+                end
+                
+                subgraph "Application Layer"
+                    subgraph "Nginx Deployment"
+                        NGINX_POD[Nginx Pod<br/>nginx:latest<br/>Port: 80, 443]
+                        NGINX_SVC[nginx-service<br/>ClusterIP]
+                    end
+                    
+                    subgraph "MySQL Deployment"
+                        MYSQL_POD[MySQL Pod<br/>mysql:8.0<br/>Port: 3306]
+                        MYSQL_SVC[mysql-service<br/>ClusterIP]
+                        PV[Persistent Volume<br/>/var/lib/mysql]
+                    end
+                end
+            end
+        end
+    end
+    
+    %% External connections
+    HOST_HTTP[localhost:9080<br/>HTTP] --> NGINX_SVC
+    HOST_HTTPS[localhost:9443<br/>HTTPS] --> NGINX_SVC
+    HOST_MYSQL[localhost:30306<br/>MySQL] --> MYSQL_SVC
+    
+    %% Internal connections
+    NGINX_SVC --> NGINX_POD
+    MYSQL_SVC --> MYSQL_POD
+    MYSQL_POD --> PV
+    
+    %% Styling
+    classDef controlPlane fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef app fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class CP,API,ETCD,SCHED,CM,CP_KUBELET controlPlane
+    class W1,W1_KUBELET,W1_RUNTIME,W1_PROXY,W2,W2_KUBELET,W2_RUNTIME,W2_PROXY worker
+    class NGINX_POD,NGINX_SVC,MYSQL_POD,MYSQL_SVC,PV app
+    class HOST_HTTP,HOST_HTTPS,HOST_MYSQL external
 ```
 
 ### Port Mapping Architecture
 
-```
-Host Machine (localhost)                    Kind Cluster
-┌─────────────────────────┐                ┌────────────────────────┐
-│                         │                │                        │
-│ Port 9080  ──────────────┼────────────────┼─→ nginx-service:80     │
-│ (HTTP)                  │                │   (Nginx Pod)          │
-│                         │                │                        │
-│ Port 9443  ──────────────┼────────────────┼─→ nginx-service:443    │
-│ (HTTPS)                 │                │   (Nginx Pod)          │
-│                         │                │                        │
-│ Port 30306 ──────────────┼────────────────┼─→ mysql-service:3306   │
-│ (MySQL)                 │                │   (MySQL Pod)          │
-│                         │                │                        │
-└─────────────────────────┘                └────────────────────────┘
+```mermaid
+graph LR
+    subgraph "Host Machine (localhost)"
+        HTTP[Port 9080<br/>HTTP]
+        HTTPS[Port 9443<br/>HTTPS]  
+        MYSQL[Port 30306<br/>MySQL]
+    end
+    
+    subgraph "Kind Cluster"
+        subgraph "Services"
+            NGINX_SVC[nginx-service<br/>:80, :443]
+            MYSQL_SVC[mysql-service<br/>:3306]
+        end
+        
+        subgraph "Pods"
+            NGINX_POD[Nginx Pod<br/>:80, :443]
+            MYSQL_POD[MySQL Pod<br/>:3306]
+        end
+    end
+    
+    %% Port forwarding connections
+    HTTP -.->|Port Forward| NGINX_SVC
+    HTTPS -.->|Port Forward| NGINX_SVC
+    MYSQL -.->|NodePort| MYSQL_SVC
+    
+    %% Service to Pod connections
+    NGINX_SVC --> NGINX_POD
+    MYSQL_SVC --> MYSQL_POD
+    
+    %% Styling
+    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef service fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef pod fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    
+    class HTTP,HTTPS,MYSQL host
+    class NGINX_SVC,MYSQL_SVC service
+    class NGINX_POD,MYSQL_POD pod
 ```
 
 ## 🔧 Component Architecture
@@ -112,135 +158,81 @@ Project Root
 
 ### 1. Cluster Creation Workflow
 
-```
-┌─────────────────┐
-│   User Starts   │
-│   ./setup.sh    │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Interactive     │
-│ Menu Display    │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Option 1:       │    │ Option 2:       │    │ Option 3:       │
-│ Create Cluster  │    │ List Clusters   │    │ Delete Cluster  │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          ▼                      ▼                      ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Get Cluster     │    │ Call            │    │ Select Cluster  │
-│ Name (Input)    │    │ list_clusters() │    │ to Delete       │
-└─────────┬───────┘    └─────────────────┘    └─────────┬───────┘
-          │                                             │
-          ▼                                             ▼
-┌─────────────────┐                           ┌─────────────────┐
-│ Generate        │                           │ Confirmation    │
-│ kind-config.yaml│                           │ Prompt          │
-└─────────┬───────┘                           └─────────┬───────┘
-          │                                             │
-          ▼                                             ▼
-┌─────────────────┐                           ┌─────────────────┐
-│ kind create     │                           │ kind delete     │
-│ cluster         │                           │ cluster         │
-└─────────┬───────┘                           └─────────────────┘
-          │
-          ▼
-┌─────────────────┐
-│ Wait for        │
-│ Cluster Ready   │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Deploy Nginx    │
-│ (nginx-*.yaml)  │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Deploy MySQL    │
-│ (mysql-*.yaml)  │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Run Tests       │
-│ (test-cluster.sh)│
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Display Access  │
-│ Information     │
-└─────────────────┘
+```mermaid
+flowchart TD
+    START([User Starts<br/>./setup.sh]) --> MENU[Interactive Menu Display]
+    
+    MENU --> OPT1[Option 1: Create Cluster]
+    MENU --> OPT2[Option 2: List Clusters]
+    MENU --> OPT3[Option 3: Delete Cluster]
+    
+    %% Create Cluster Path
+    OPT1 --> INPUT[Get Cluster Name<br/>Input]
+    INPUT --> GENERATE[Generate<br/>kind-config.yaml]
+    GENERATE --> CREATE[kind create cluster]
+    CREATE --> WAIT[Wait for Cluster Ready]
+    WAIT --> NGINX[Deploy Nginx<br/>nginx-*.yaml]
+    NGINX --> MYSQL[Deploy MySQL<br/>mysql-*.yaml]
+    MYSQL --> TEST[Run Tests<br/>test-cluster.sh]
+    TEST --> ACCESS[Display Access Information]
+    
+    %% List Clusters Path
+    OPT2 --> LIST[Call list_clusters()]
+    
+    %% Delete Cluster Path
+    OPT3 --> SELECT[Select Cluster to Delete]
+    SELECT --> CONFIRM[Confirmation Prompt]
+    CONFIRM --> DELETE[kind delete cluster]
+    
+    %% Styling
+    classDef startEnd fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef process fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef action fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class START,ACCESS startEnd
+    class MENU,INPUT,GENERATE,WAIT,LIST,SELECT,CONFIRM process
+    class OPT1,OPT2,OPT3 decision
+    class CREATE,NGINX,MYSQL,TEST,DELETE action
 ```
 
 ### 2. Testing Workflow
 
-```
-┌─────────────────┐
-│ test-cluster.sh │
-│ [cluster-name]  │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Cluster Exists? │ ─────────→ │ Error: Cluster  │
-│ (kubectl)       │            │ Not Found       │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐
-│ Setup Port      │
-│ Forwarding      │
-│ (Background)    │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Test Basic      │ ─────────→ │ Error: kubectl  │
-│ Connectivity    │            │ Issues          │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Test Nginx      │ ─────────→ │ Error: Nginx    │
-│ HTTP Endpoint   │            │ Not Accessible  │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Test Nginx      │ ─────────→ │ Error: HTTPS    │
-│ HTTPS Endpoint  │            │ Certificate     │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Test MySQL      │ ─────────→ │ Error: Database │
-│ Connection      │            │ Connection      │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐     ❌     ┌─────────────────┐
-│ Test Data       │ ─────────→ │ Error: Data     │
-│ Operations      │            │ Integrity       │
-└─────────┬───────┘            └─────────────────┘
-          │ ✅
-          ▼
-┌─────────────────┐
-│ Cleanup Port    │
-│ Forwarding      │
-└─────────┬───────┘
-          │
-          ▼
-┌─────────────────┐
-│ Display Test    │
-│ Results Summary │
-└─────────────────┘
+```mermaid
+flowchart TD
+    START([test-cluster.sh<br/>[cluster-name]]) --> CHECK{Cluster Exists?<br/>kubectl}
+    
+    CHECK -->|❌| ERROR1[Error: Cluster<br/>Not Found]
+    CHECK -->|✅| SETUP[Setup Port<br/>Forwarding<br/>Background]
+    
+    SETUP --> TEST1{Test Basic<br/>Connectivity}
+    TEST1 -->|❌| ERROR2[Error: kubectl<br/>Issues]
+    TEST1 -->|✅| TEST2{Test Nginx<br/>HTTP Endpoint}
+    
+    TEST2 -->|❌| ERROR3[Error: Nginx<br/>Not Accessible]
+    TEST2 -->|✅| TEST3{Test Nginx<br/>HTTPS Endpoint}
+    
+    TEST3 -->|❌| ERROR4[Error: HTTPS<br/>Certificate]
+    TEST3 -->|✅| TEST4{Test MySQL<br/>Connection}
+    
+    TEST4 -->|❌| ERROR5[Error: Database<br/>Connection]
+    TEST4 -->|✅| TEST5{Test Data<br/>Operations}
+    
+    TEST5 -->|❌| ERROR6[Error: Data<br/>Integrity]
+    TEST5 -->|✅| CLEANUP[Cleanup Port<br/>Forwarding]
+    
+    CLEANUP --> RESULTS([Display Test<br/>Results Summary])
+    
+    %% Styling
+    classDef startEnd fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef process fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px
+    
+    class START,RESULTS startEnd
+    class SETUP,CLEANUP process
+    class CHECK,TEST1,TEST2,TEST3,TEST4,TEST5 decision
+    class ERROR1,ERROR2,ERROR3,ERROR4,ERROR5,ERROR6 error
 ```
 
 ### 3. Cluster State Management
@@ -340,33 +332,63 @@ START CLUSTER:
 
 ### Dependency Graph
 
-```
-setup.sh
-├── Uses: kind-config-{name}.yaml (generated)
-├── Uses: nginx-deployment.yaml
-├── Uses: nginx-service.yaml  
-├── Uses: mysql-*.yaml files
-├── Calls: test-cluster.sh
-└── Calls: cluster-utils.sh (for listing)
-
-cluster-utils.sh
-├── Uses: Docker API (container management)
-├── Uses: kubectl (cluster operations)
-├── Calls: mysqldump (for backups)
-└── Independent operation
-
-test-cluster.sh  
-├── Uses: kubectl (testing)
-├── Uses: curl (HTTP testing)
-├── Uses: mysql client (DB testing)
-├── Uses: openssl (certificate testing)
-└── Called by: setup.sh
-
-demo.sh
-├── Calls: setup.sh (simulated)
-├── Calls: cluster-utils.sh
-├── Calls: test-cluster.sh
-└── Interactive demonstration mode
+```mermaid
+graph TB
+    subgraph "Scripts"
+        SETUP[setup.sh<br/>Interactive Manager]
+        UTILS[cluster-utils.sh<br/>CLI Utilities]
+        TEST[test-cluster.sh<br/>Testing Suite]
+        DEMO[demo.sh<br/>Feature Demo]
+    end
+    
+    subgraph "Configuration Files"
+        KIND_TEMPLATE[kind-config.yaml<br/>Template]
+        KIND_GENERATED[kind-config-{name}.yaml<br/>Generated]
+        NGINX_FILES[nginx-*.yaml<br/>Web Server]
+        MYSQL_FILES[mysql-*.yaml<br/>Database]
+    end
+    
+    subgraph "External Tools"
+        DOCKER[Docker API<br/>Container Management]
+        KUBECTL[kubectl<br/>Cluster Operations]
+        CURL[curl<br/>HTTP Testing]
+        MYSQL_CLIENT[mysql client<br/>DB Testing]
+        MYSQLDUMP[mysqldump<br/>Backup]
+        OPENSSL[openssl<br/>Certificate Testing]
+        KIND_CLI[kind CLI<br/>Cluster Creation]
+    end
+    
+    %% Script relationships
+    SETUP -.->|calls| TEST
+    SETUP -.->|calls| UTILS
+    DEMO -.->|calls| SETUP
+    DEMO -.->|calls| UTILS
+    DEMO -.->|calls| TEST
+    
+    %% File dependencies
+    SETUP -->|generates| KIND_GENERATED
+    SETUP -->|uses| KIND_TEMPLATE
+    SETUP -->|uses| NGINX_FILES
+    SETUP -->|uses| MYSQL_FILES
+    
+    %% External tool usage
+    SETUP -->|uses| KIND_CLI
+    UTILS -->|uses| DOCKER
+    UTILS -->|uses| KUBECTL
+    UTILS -->|uses| MYSQLDUMP
+    TEST -->|uses| KUBECTL
+    TEST -->|uses| CURL
+    TEST -->|uses| MYSQL_CLIENT
+    TEST -->|uses| OPENSSL
+    
+    %% Styling
+    classDef script fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef config fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class SETUP,UTILS,TEST,DEMO script
+    class KIND_TEMPLATE,KIND_GENERATED,NGINX_FILES,MYSQL_FILES config
+    class DOCKER,KUBECTL,CURL,MYSQL_CLIENT,MYSQLDUMP,OPENSSL,KIND_CLI external
 ```
 
 ### Data Exchange
@@ -388,38 +410,57 @@ cluster-utils.sh ←──── Docker Containers ────── Kind Runti
 
 ### Internal Cluster Networking
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Kind Network Bridge                      │
-│                     (172.18.0.0/16)                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Control Plane Node          Worker Node 1     Worker Node 2│
-│  ┌─────────────────┐         ┌─────────────┐   ┌─────────────┐│
-│  │ 172.18.0.2      │         │ 172.18.0.3  │   │ 172.18.0.4  ││
-│  │                 │         │             │   │             ││
-│  │ kube-apiserver  │         │ kubelet     │   │ kubelet     ││
-│  │ :6443           │         │ kube-proxy  │   │ kube-proxy  ││
-│  │                 │         │             │   │             ││
-│  │ etcd :2379      │         │             │   │             ││
-│  └─────────────────┘         └─────────────┘   └─────────────┘│
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                    Service Network                          │
-│                     (10.96.0.0/16)                         │
-│                                                             │
-│  nginx-service        mysql-service        kubernetes       │
-│  10.96.1.100         10.96.1.200          10.96.0.1        │
-│  :80, :443           :3306                :443              │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                     Pod Network                             │
-│                    (10.244.0.0/16)                         │
-│                                                             │
-│  nginx-pod           mysql-pod                              │
-│  10.244.1.10         10.244.2.10                           │
-│  :80, :443           :3306                                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Kind Network Bridge (172.18.0.0/16)"
+        subgraph "Control Plane Node"
+            CP[172.18.0.2<br/>Control Plane]
+            API_SRV[kube-apiserver<br/>:6443]
+            ETCD_SRV[etcd<br/>:2379]
+        end
+        
+        subgraph "Worker Node 1"
+            W1[172.18.0.3<br/>Worker 1]
+            W1_KUBELET[kubelet]
+            W1_PROXY[kube-proxy]
+        end
+        
+        subgraph "Worker Node 2"
+            W2[172.18.0.4<br/>Worker 2]
+            W2_KUBELET[kubelet]
+            W2_PROXY[kube-proxy]
+        end
+    end
+    
+    subgraph "Service Network (10.96.0.0/16)"
+        NGINX_SVC[nginx-service<br/>10.96.1.100<br/>:80, :443]
+        MYSQL_SVC[mysql-service<br/>10.96.1.200<br/>:3306]
+        K8S_SVC[kubernetes<br/>10.96.0.1<br/>:443]
+    end
+    
+    subgraph "Pod Network (10.244.0.0/16)"
+        NGINX_POD[nginx-pod<br/>10.244.1.10<br/>:80, :443]
+        MYSQL_POD[mysql-pod<br/>10.244.2.10<br/>:3306]
+    end
+    
+    %% Service to Pod connections
+    NGINX_SVC -.->|routes to| NGINX_POD
+    MYSQL_SVC -.->|routes to| MYSQL_POD
+    
+    %% Node connections
+    CP -.->|manages| W1
+    CP -.->|manages| W2
+    
+    %% Styling
+    classDef controlPlane fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef service fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef pod fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    
+    class CP,API_SRV,ETCD_SRV controlPlane
+    class W1,W1_KUBELET,W1_PROXY,W2,W2_KUBELET,W2_PROXY worker
+    class NGINX_SVC,MYSQL_SVC,K8S_SVC service
+    class NGINX_POD,MYSQL_POD pod
 ```
 
 ### External Access Pattern
@@ -462,38 +503,110 @@ Internet/Host
 
 ### MySQL Data Persistence
 
-```
-Host Volume Mount                     Container Volume Mount
-┌─────────────────────────────────┐  ┌─────────────────────────────────┐
-│ Docker Desktop VM               │  │ MySQL Container                 │
-│                                 │  │                                 │
-│ /var/lib/docker/volumes/        │  │ /var/lib/mysql                  │
-│ mysql-data-{cluster}/_data      │ ←→ │                                 │
-│                                 │  │ ┌─────────────────────────────┐ │
-│ ┌─────────────────────────────┐ │  │ │ • ibdata1 (tablespace)     │ │
-│ │ • mysql/ (system tables)   │ │  │ │ • ib_logfile* (redo logs)   │ │
-│ │ • performance_schema/       │ │  │ │ • mysql.ibd                 │ │
-│ │ • sys/                      │ │  │ │ • undo_001, undo_002       │ │
-│ │ • testdb/ (app database)    │ │  │ │ • testdb/ (application DB)  │ │
-│ │ • binlog.* (binary logs)    │ │  │ │ • binlog.* (replication)    │ │
-│ └─────────────────────────────┘ │  │ └─────────────────────────────┘ │
-└─────────────────────────────────┘  └─────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph "Host Machine"
+        subgraph "Docker Desktop VM"
+            subgraph "Docker Volume"
+                VOLUME["/var/lib/docker/volumes/<br/>mysql-data-{cluster}/_data"]
+                
+                subgraph "Persistent Data"
+                    MYSQL_SYS["mysql/ (system tables)"]
+                    PERF_SCHEMA["performance_schema/"]
+                    SYS_SCHEMA["sys/"]
+                    APP_DB["testdb/ (app database)"]
+                    BINLOGS["binlog.* (binary logs)"]
+                end
+            end
+        end
+    end
+    
+    subgraph "Kubernetes Cluster"
+        subgraph "MySQL Container"
+            MOUNT["/var/lib/mysql"]
+            
+            subgraph "Database Files"
+                IBDATA["ibdata1 (tablespace)"]
+                REDOLOGS["ib_logfile* (redo logs)"]
+                MYSQL_IBD["mysql.ibd"]
+                UNDO["undo_001, undo_002"]
+                TESTDB["testdb/ (application DB)"]
+                BIN_REPLICA["binlog.* (replication)"]
+            end
+        end
+    end
+    
+    %% Volume mounting
+    VOLUME -.->|Volume Mount| MOUNT
+    
+    %% Data synchronization
+    MYSQL_SYS -.->|sync| IBDATA
+    PERF_SCHEMA -.->|sync| REDOLOGS
+    SYS_SCHEMA -.->|sync| MYSQL_IBD
+    APP_DB -.->|sync| TESTDB
+    BINLOGS -.->|sync| BIN_REPLICA
+    
+    %% Styling
+    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef volume fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef container fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef data fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+    
+    class VOLUME host
+    class MYSQL_SYS,PERF_SCHEMA,SYS_SCHEMA,APP_DB,BINLOGS volume
+    class MOUNT container
+    class IBDATA,REDOLOGS,MYSQL_IBD,UNDO,TESTDB,BIN_REPLICA data
 ```
 
 ### Configuration Data Flow
 
-```
-Template Files                    Generated Files               Runtime
-┌─────────────────┐              ┌─────────────────┐           ┌─────────────────┐
-│ kind-config.yaml│              │kind-config-     │           │ Kubernetes      │
-│ (template)      │ ──generate──→│ {name}.yaml     │ ──apply──→│ Cluster         │
-└─────────────────┘              └─────────────────┘           └─────────────────┘
-
-┌─────────────────┐              ┌─────────────────┐           ┌─────────────────┐
-│ nginx-*.yaml    │              │ SSL Certificates│           │ Nginx Pods      │
-│ mysql-*.yaml    │ ──process───→│ Config Maps     │ ──mount──→│ MySQL Pods      │
-│ (static)        │              │ Secrets         │           │ Services        │
-└─────────────────┘              └─────────────────┘           └─────────────────┘
+```mermaid
+graph LR
+    subgraph "Template Files"
+        TEMPLATE[kind-config.yaml<br/>template]
+        STATIC_NGINX[nginx-*.yaml<br/>static]
+        STATIC_MYSQL[mysql-*.yaml<br/>static]
+    end
+    
+    subgraph "Generated Files"
+        GENERATED[kind-config-{name}.yaml<br/>cluster-specific]
+        SSL_CERTS[SSL Certificates<br/>nginx.crt, nginx.key]
+        CONFIG_MAPS[ConfigMaps<br/>nginx-config]
+        SECRETS[Secrets<br/>mysql-secret]
+    end
+    
+    subgraph "Runtime"
+        K8S_CLUSTER[Kubernetes Cluster]
+        NGINX_PODS[Nginx Pods]
+        MYSQL_PODS[MySQL Pods]
+        SERVICES[Services]
+    end
+    
+    %% Template to Generated
+    TEMPLATE -->|generate| GENERATED
+    STATIC_NGINX -->|process| SSL_CERTS
+    STATIC_NGINX -->|process| CONFIG_MAPS
+    STATIC_MYSQL -->|process| SECRETS
+    
+    %% Generated to Runtime
+    GENERATED -->|apply| K8S_CLUSTER
+    SSL_CERTS -->|mount| NGINX_PODS
+    CONFIG_MAPS -->|mount| NGINX_PODS
+    SECRETS -->|mount| MYSQL_PODS
+    
+    %% Runtime connections
+    K8S_CLUSTER -.-> SERVICES
+    SERVICES -.-> NGINX_PODS
+    SERVICES -.-> MYSQL_PODS
+    
+    %% Styling
+    classDef template fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef generated fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef runtime fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    
+    class TEMPLATE,STATIC_NGINX,STATIC_MYSQL template
+    class GENERATED,SSL_CERTS,CONFIG_MAPS,SECRETS generated
+    class K8S_CLUSTER,NGINX_PODS,MYSQL_PODS,SERVICES runtime
 ```
 
 ## 💽 Storage Architecture
