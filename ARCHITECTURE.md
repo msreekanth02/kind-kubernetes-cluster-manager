@@ -43,11 +43,11 @@ graph TB
     MYSQLEXT --> MYSQL
     MYSQL --> PV
     
-    classDef controlPlane fill:#e1f5fe,stroke:#01579b,stroke-width:3px
-    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
-    classDef app fill:#e8f5e8,stroke:#1b5e20,stroke-width:3px
-    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:3px
-    classDef storage fill:#f1f8e9,stroke:#33691e,stroke-width:3px
+    classDef controlPlane fill:#e1f5fe,stroke:#01579b,stroke-width:3px,font-size:16px,font-weight:bold
+    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:3px,font-size:16px,font-weight:bold
+    classDef app fill:#e8f5e8,stroke:#1b5e20,stroke-width:3px,font-size:16px,font-weight:bold
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:3px,font-size:16px,font-weight:bold
+    classDef storage fill:#f1f8e9,stroke:#33691e,stroke-width:3px,font-size:16px,font-weight:bold
     
     class CP controlPlane
     class W1,W2 worker
@@ -75,8 +75,8 @@ graph LR
     HP2 --> NS  
     HP3 --> MS
     
-    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef service fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef service fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
     
     class HP1,HP2,HP3 host
     class NS,MS service
@@ -106,9 +106,9 @@ flowchart TD
     OPT2 --> LIST["📊 Show All Clusters<br/>Docker inspection"]
     OPT3 --> SELECT["🎯 Select Cluster"] --> DELETE["🗑️ Delete Cluster"]
     
-    classDef start fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef process fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
-    classDef action fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef start fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef process fill:#e3f2fd,stroke:#0277bd,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef action fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
     
     class START,ACCESS start
     class MENU,INPUT,GENERATE,WAIT,LIST,SELECT process
@@ -139,9 +139,9 @@ flowchart TD
     
     CLEANUP --> RESULTS["📋 Test Results<br/>Summary Report"]
     
-    classDef start fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef start fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
     classDef test fill:#e3f2fd,stroke:#0277bd,stroke-width:2px  
-    classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px,font-size:16px,font-weight:bold
     
     class START,RESULTS start
     class CHECK,TEST1,TEST2,TEST3,TEST4,SETUP,CLEANUP test
@@ -196,9 +196,9 @@ graph TB
     MYSQL_CONFIGS --> KUBECTL
     HTML --> NGINX_CONFIGS
     
-    classDef script fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
-    classDef config fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef tool fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef script fill:#e3f2fd,stroke:#0277bd,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef config fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef tool fill:#fff3e0,stroke:#e65100,stroke-width:2px,font-size:16px,font-weight:bold
     
     class SETUP,UTILS,TEST,DEMO script
     class KIND_CONFIG,NGINX_CONFIGS,MYSQL_CONFIGS,HTML config
@@ -250,11 +250,11 @@ graph TB
     NGINX_SVC --> NGINX_POD2
     MYSQL_SVC --> MYSQL_POD
     
-    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef control fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef pod fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef service fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef control fill:#e1f5fe,stroke:#01579b,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef worker fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef pod fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef service fill:#f1f8e9,stroke:#33691e,stroke-width:2px,font-size:16px,font-weight:bold
     
     class HOST_IP host
     class CP_NODE control
@@ -292,10 +292,10 @@ graph LR
     MOUNT --> LOGS
     MOUNT --> CONFIG
     
-    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef volume fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
-    classDef container fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef data fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef host fill:#fff3e0,stroke:#e65100,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef volume fill:#e3f2fd,stroke:#0277bd,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef container fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef data fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
     
     class VOLUME volume
     class MOUNT container
@@ -326,9 +326,9 @@ graph TB
     PV_RESOURCE --> PVC_RESOURCE
     PVC_RESOURCE --> MYSQL_POD_STORAGE
     
-    classDef docker fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef docker fill:#e3f2fd,stroke:#0277bd,stroke-width:2px,font-size:16px,font-weight:bold
     classDef k8s fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef pod fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef pod fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
     
     class DOCKER_VOLUME docker
     class PV_RESOURCE,PVC_RESOURCE k8s
@@ -372,10 +372,10 @@ graph TB
     ROOT_PASS --> APP_USER
     TLS --> CONTROLLED_ACCESS
     
-    classDef cluster fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef nginx fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef mysql fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef network fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef cluster fill:#e1f5fe,stroke:#01579b,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef nginx fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef mysql fill:#fff3e0,stroke:#e65100,stroke-width:2px,font-size:16px,font-weight:bold
+    classDef network fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,font-size:16px,font-weight:bold
     
     class RBAC,TLS,ISOLATION cluster
     class SSL_CERTS,HTTPS_ONLY nginx
